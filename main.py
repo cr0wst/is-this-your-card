@@ -46,7 +46,7 @@ def process(frame, training_set):
             ((x, y), (w, h), a) = rect = cv2.minAreaRect(c)
             box = cv2.boxPoints(rect)
             box = np.int0(box)
-            cv2.drawContours(image, [box], -1, (0, 255, 0), 3)
+
             # sometimes w and h are reversed for turned images
             ar = w / float(h) if w > h > 0 else h / float(w)
 
