@@ -37,7 +37,7 @@ def process(frame, training_set):
     dilate = process_webcam_frame(image)
     contours = get_contours(dilate)
 
-    for c in contours:
+    for c in contours[:2]:
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
         sides = len(approx)
