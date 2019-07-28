@@ -6,21 +6,16 @@ import imutils
 import numpy as np
 
 TRAINING_IMAGE_PATH = 'images/train/cards'
-MIN_THRESHOLD = 100
-MAX_THRESHOLD = 175
+
+MIN_THRESHOLD = 50
+MAX_THRESHOLD = 150
 
 
 def main():
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(1)
     training_set = load_training_set()
     cv2.namedWindow("Image")
-    cv2.createTrackbar("Min Threshold", "Image", 100, 255, update_min_threshold)
-    cv2.createTrackbar("Max Threshold", "Image", 175, 255, update_max_threshold)
     while True:
-        global MIN_THRESHOLD
-        global MAX_THRESHOLD
-        MIN_THRESHOLD = cv2.getTrackbarPos("Min Threshold", "Image")
-        MAX_THRESHOLD = cv2.getTrackbarPos("Max Threshold", "Image")
         ret, frame = cap.read()
         process(frame, training_set)
 
@@ -37,46 +32,25 @@ def process(frame, training_set):
     dilate = process_webcam_frame(image)
     contours = get_contours(dilate)
 
-    for c in contours[:2]:
-        peri = cv2.arcLength(c, True)
-        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
-        sides = len(approx)
+    for c in contours[:2]:   
+        ((x, y), (w, h), a) = rect = cv2.minAreaRect(c)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
 
-        if 3 < sides <= 6:
-            ((x, y), (w, h), a) = rect = cv2.minAreaRect(c)
-            box = cv2.boxPoints(rect)
-            box = np.int0(box)
+        # sometimes w and h are reversed for turned images
+        ar = w / float(h) if w > h > 0 else h / float(w)
 
-            # sometimes w and h are reversed for turned images
-            ar = w / float(h) if w > h > 0 else h / float(w)
-
-            if 1.30 <= ar <= 1.42:
-                cv2.drawContours(image, [box], -1, (0, 255, 0), 3)
-                cropped_image = crop_image(image, rect)
-                if cropped_image.shape[0] > 0 and cropped_image.shape[1] > 0:
-                    cropped_image = process_card_image(cropped_image)
-                    cropped_image = resize_image(cropped_image)
-                    prediction, percentage = predict(training_set, cropped_image)
-                    cv2.putText(image, prediction, (int(x - w / 2), int(y)), cv2.FONT_HERSHEY_SIMPLEX, .75, 255, 4)
-                    cv2.putText(image, str(f'{percentage * 100:.2f}' + '%'), (int(x - w / 2), int(y + 20)),
-                                cv2.FONT_HERSHEY_SIMPLEX, .50, 255, 2)
+        if 1.30 <= ar <= 1.42:
+            cv2.drawContours(image, [box], -1, (0, 255, 0), 3)
+            cropped_image = crop_image(image, rect)
+            if cropped_image.shape[0] > 0 and cropped_image.shape[1] > 0:
+                cropped_image = process_card_image(cropped_image)
+                cropped_image = resize_image(cropped_image)
+                prediction, percentage = predict(training_set, cropped_image)
+                cv2.putText(image, prediction, (int(x - w / 2), int(y)), cv2.FONT_HERSHEY_SIMPLEX, .75, 255, 4)
+                cv2.putText(image, str(f'{percentage * 100:.2f}' + '%'), (int(x - w / 2), int(y + 20)),
+                            cv2.FONT_HERSHEY_SIMPLEX, .50, 255, 2)
     cv2.imshow("Image", np.hstack((image, cv2.cvtColor(dilate, cv2.COLOR_RGB2BGR))))
-
-
-def update_hough_threshold(value):
-    global HOUGH_THRESH
-    HOUGH_THRESH = value
-
-
-def update_min_threshold(value):
-    global MIN_THRESHOLD
-    MIN_THRESHOLD = value
-
-
-def update_max_threshold(value):
-    global MAX_THRESHOLD
-    MAX_THRESHOLD = value
-
 
 def crop_image(original_image, rect):
     ((x, y), (w, h), a) = rect
@@ -192,9 +166,9 @@ def label_images(image_paths, labels):
 def process_webcam_frame(frame):
     kernel = np.ones((5, 5), np.uint8)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    edges = cv2.Canny(blur, MIN_THRESHOLD, MAX_THRESHOLD)
+    blur = cv2.bilateralFilter(gray, 10, 15, 15)
+    cv2.imshow("blur", blur)
+    edges = cv2.Canny(blur, MIN_THRESHOLD, MAX_THRESHOLD, True)
     dilate = cv2.dilate(edges, kernel, iterations=1)
 
     return dilate
